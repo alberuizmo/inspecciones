@@ -1,0 +1,22 @@
+{
+  "name": "Inspecciones Postes PWA",
+  "short_name": "Inspecciones",
+  "description": "PWA para inspecciones de postes de alumbrado",
+  "theme_color": "#FFD700",
+  "background_color": "#FFFFFF",
+  "display": "standalone",
+  "scope": "./",
+  "start_url": "./",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png", 
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

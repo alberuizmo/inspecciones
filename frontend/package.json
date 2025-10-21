@@ -1,0 +1,28 @@
+{
+  "name": "frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "serve": "vite preview",
+    "lint": "eslint . --ext .ts,.vue"
+  },
+  "dependencies": {
+    "quasar": "^2.14.0",
+    "vue": "^3.4.0",
+    "pinia": "^2.1.7",
+    "vue-router": "^4.2.5",
+    "axios": "^1.6.2",
+    "dexie": "^3.2.4",
+    "@vueuse/core": "^10.7.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10",
+    "@vitejs/plugin-vue": "^5.0.2",
+    "eslint": "^8.56.0",
+    "eslint-plugin-vue": "^9.19.2",
+    "@quasar/vite-plugin": "^1.4.1"
+  }
+}
