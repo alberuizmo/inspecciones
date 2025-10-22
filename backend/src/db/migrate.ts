@@ -1,7 +1,5 @@
 import mysql from 'mysql2/promise'
 import dotenv from 'dotenv'
-import fs from 'fs'
-import path from 'path'
 
 dotenv.config()
 
@@ -21,23 +19,34 @@ async function runMigration() {
     console.log('✅ Conectado a:', process.env.DB_HOST)
     console.log('📝 Base de datos:', process.env.DB_NAME)
 
-    // Leer archivo SQL
-    const sqlFile = path.join(__dirname, 'migrate-company.sql')
-    const sql = fs.readFileSync(sqlFile, 'utf-8')
+    console.log('\n📜 Creando tabla Company...\n')
 
-    // Ejecutar cada statement
-    const statements = sql
-      .split(';')
-      .map(s => s.trim())
-      .filter(s => s.length > 0 && !s.startsWith('--'))
+    // Crear tabla Company
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS Company (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        address VARCHAR(500),
+        phone VARCHAR(50),
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_name (name)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `)
+    console.log('✅ Tabla Company creada')
 
-    console.log(`\n📜 Ejecutando ${statements.length} statements...\n`)
+    // Verificar si existe alguna empresa
+    const [rows] = await connection.query('SELECT COUNT(*) as count FROM Company')
+    const count = (rows as any)[0].count
 
-    for (const statement of statements) {
-      if (statement.trim()) {
-        console.log('⚡', statement.substring(0, 80) + '...')
-        await connection.query(statement)
-      }
+    if (count === 0) {
+      console.log('� Creando empresa por defecto...')
+      await connection.query(
+        `INSERT INTO Company (name, address, phone) VALUES (?, ?, ?)`,
+        ['Empresa Principal', 'Por definir', '000000000']
+      )
+      console.log('✅ Empresa por defecto creada')
+    } else {
+      console.log(`✅ Ya existen ${count} empresa(s) en la base de datos`)
     }
 
     console.log('\n✅ Migración completada exitosamente!')
