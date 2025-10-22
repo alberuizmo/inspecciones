@@ -15,6 +15,84 @@ interface UserRow extends RowDataPacket {
   companyId: number
 }
 
+// Registro de empresa + admin (primer usuario)
+router.post('/register-company', async (req: Request, res: Response) => {
+  const connection = await pool.getConnection()
+  
+  try {
+    const { companyName, companyAddress, companyPhone, name, email, password } = req.body
+
+    // Validar campos requeridos
+    if (!companyName || !name || !email || !password) {
+      return res.status(400).json({ error: 'Nombre de empresa, nombre, email y contraseña son requeridos' })
+    }
+
+    // Iniciar transacción
+    await connection.beginTransaction()
+
+    try {
+      // 1. Crear empresa
+      const [companyResult] = await connection.query(
+        'INSERT INTO Company (name, address, phone) VALUES (?, ?, ?)',
+        [companyName, companyAddress || null, companyPhone || null]
+      )
+      
+      const companyId = (companyResult as any).insertId
+
+      // 2. Hash password
+      const hashedPassword = await bcrypt.hash(password, 10)
+
+      // 3. Crear usuario admin
+      const [userResult] = await connection.query(
+        'INSERT INTO User (email, name, password, role, companyId) VALUES (?, ?, ?, ?, ?)',
+        [email, name, hashedPassword, 'admin', companyId]
+      )
+
+      const userId = (userResult as any).insertId
+
+      // Commit transacción
+      await connection.commit()
+
+      // 4. Generar token JWT
+      const token = jwt.sign(
+        { sub: userId, email, role: 'admin' },
+        process.env.JWT_SECRET || 'changeme',
+        { expiresIn: '7d' }
+      )
+
+      res.json({
+        success: true,
+        message: 'Empresa y administrador creados exitosamente',
+        token,
+        user: {
+          id: userId,
+          email,
+          name,
+          role: 'admin',
+          companyId
+        },
+        company: {
+          id: companyId,
+          name: companyName
+        }
+      })
+    } catch (error) {
+      // Rollback en caso de error
+      await connection.rollback()
+      throw error
+    }
+  } catch (error: any) {
+    console.error('Error en registro de empresa:', error)
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ error: 'El email ya está registrado' })
+    }
+    res.status(500).json({ error: 'Error al registrar empresa y administrador' })
+  } finally {
+    connection.release()
+  }
+})
+
+// Registro de usuario (para admins que agregan usuarios a su empresa)
 router.post('/register', async (req: Request, res: Response) => {
   try {
     const { email, name, password, role, companyId } = req.body

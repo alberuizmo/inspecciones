@@ -28,7 +28,21 @@ async function setupDatabase() {
     await connection.query(`DROP TABLE IF EXISTS Poste`)
     await connection.query(`DROP TABLE IF EXISTS Color`)
     await connection.query(`DROP TABLE IF EXISTS User`)
+    await connection.query(`DROP TABLE IF EXISTS Company`)
     console.log('✅ Tablas eliminadas\n')
+
+    // Crear tabla Company
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS Company (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        address VARCHAR(500),
+        phone VARCHAR(50),
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_name (name)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `)
+    console.log('✅ Tabla Company creada')
 
     // Crear tabla User
     await connection.query(`
@@ -113,6 +127,15 @@ async function setupDatabase() {
       )
     }
     console.log('✅ Colores insertados')
+
+    // Insertar empresa de prueba
+    await connection.query(
+      `INSERT INTO Company (name, address, phone) 
+       VALUES (?, ?, ?) 
+       ON DUPLICATE KEY UPDATE name=name`,
+      ['Empresa Test', 'Calle 123 #45-67', '3001234567']
+    )
+    console.log('✅ Empresa de prueba creada')
 
     // Insertar usuarios de prueba
     const adminPassword = await bcrypt.hash('admin123', 10)
