@@ -1,6 +1,11 @@
 <template>
   <div class="login-page">
     <div class="login-card">
+      <!-- Indicador de estado offline -->
+      <div v-if="isOffline" class="offline-banner">
+        ⚠️ Sin conexión a internet
+      </div>
+
       <h1>Inspecciones de Postes</h1>
       <p class="subtitle">Sistema de gestión de inspecciones</p>
       
@@ -19,8 +24,8 @@
           {{ error }}
         </div>
 
-        <button type="submit" class="btn-login" :disabled="loading">
-          {{ loading ? 'Iniciando...' : 'Entrar' }}
+        <button type="submit" class="btn-login" :disabled="loading || isOffline">
+          {{ loading ? 'Iniciando...' : isOffline ? '⚠️ Sin conexión' : 'Entrar' }}
         </button>
       </form>
 
@@ -32,7 +37,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
@@ -43,9 +48,45 @@ const email = ref('')
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
+const isOffline = ref(!navigator.onLine)
+
+// Detectar cambios en el estado de conexión
+const updateOnlineStatus = () => {
+  isOffline.value = !navigator.onLine
+}
+
+onMounted(() => {
+  // Si ya hay sesión guardada, redirigir
+  if (authStore.user) {
+    redirectByRole(authStore.user.role)
+  }
+
+  // Listeners para estado offline/online
+  window.addEventListener('online', updateOnlineStatus)
+  window.addEventListener('offline', updateOnlineStatus)
+})
+
+const redirectByRole = (role: string) => {
+  if (role === 'admin') {
+    router.push('/admin/dashboard')
+  } else if (role === 'supervisor') {
+    router.push('/supervisor/dashboard')
+  } else if (role === 'tecnico') {
+    router.push('/inspecciones')
+  } else {
+    router.push('/inspecciones')
+  }
+}
 
 const login = async () => {
   error.value = ''
+  
+  // Verificar si está offline
+  if (isOffline.value) {
+    error.value = '⚠️ No hay conexión a internet. El login requiere conexión para validar credenciales.'
+    return
+  }
+
   loading.value = true
 
   try {
@@ -53,18 +94,15 @@ const login = async () => {
     
     // Redirigir según el rol
     const role = authStore.user?.role
-    if (role === 'admin') {
-      router.push('/admin/dashboard')
-    } else if (role === 'supervisor') {
-      router.push('/supervisor/dashboard')
-    } else if (role === 'tecnico') {
-      router.push('/inspecciones')
-    } else {
-      router.push('/inspecciones')
-    }
+    redirectByRole(role || 'tecnico')
   } catch (err: any) {
     console.error('Login error:', err)
-    error.value = 'Email o contraseña incorrectos'
+    
+    if (err.message === 'Network Error' || err.code === 'ERR_NETWORK') {
+      error.value = '⚠️ No se puede conectar al servidor. Verifica tu conexión.'
+    } else {
+      error.value = 'Email o contraseña incorrectos'
+    }
   } finally {
     loading.value = false
   }
@@ -87,6 +125,23 @@ const login = async () => {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
   max-width: 400px;
   width: 100%;
+  position: relative;
+}
+
+.offline-banner {
+  background: #ff9800;
+  color: white;
+  padding: 10px;
+  border-radius: 5px;
+  text-align: center;
+  font-weight: 600;
+  margin-bottom: 20px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
 h1 {

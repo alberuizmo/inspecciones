@@ -50,6 +50,11 @@
 
       <div v-else class="tareas-list">
         <div v-for="tarea in tareasFiltradas" :key="tarea.id" class="tarea-card">
+          <!-- Indicador de pendiente de sincronización -->
+          <div v-if="tarea.syncStatus === 'pending'" class="sync-indicator">
+            ⏳ Pendiente de sincronización
+          </div>
+          
           <div class="tarea-header">
             <h3>{{ tarea.posteCodigo || `Poste #${tarea.posteId}` }}</h3>
             <span :class="['estado-badge', tarea.estado]">
@@ -99,6 +104,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import api from '../services/api'
+import { saveInspeccionesToLocal, getLocalInspecciones } from '../db/dexie'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -149,20 +155,198 @@ const cargarTareas = async () => {
       throw new Error('No se encontró el ID del técnico')
     }
 
-    const response = await api.get(`/inspecciones/tecnico/${tecnicoId}`)
-    tareas.value = response.data
+    let tareasFromAPI: any[] = []
+    let apiDisponible = true
+
+    // Intentar cargar desde la API
+    try {
+      const response = await api.get(`/inspecciones/tecnico/${tecnicoId}`)
+      tareasFromAPI = response.data
+      
+      // Guardar en IndexedDB para uso offline
+      await saveInspeccionesToLocal(response.data)
+      
+      console.log(`✅ ${tareasFromAPI.length} tareas cargadas desde API`)
+    } catch (apiError: any) {
+      console.warn('⚠️ API no disponible')
+      apiDisponible = false
+    }
+
+    // Cargar inspecciones guardadas localmente (offline)
+    const { db } = await import('../db/dexie')
+    const inspeccionesLocales = await db.inspecciones
+      .where('tecnicoId')
+      .equals(tecnicoId)
+      .toArray()
     
-    console.log(`✅ ${tareas.value.length} tareas cargadas`)
+    console.log(`💾 ${inspeccionesLocales.length} inspecciones locales encontradas`)
+
+    // Combinar tareas del API con inspecciones locales
+    const tareasMap = new Map()
+    
+    // Agregar tareas del API
+    if (apiDisponible) {
+      tareasFromAPI.forEach(t => {
+        tareasMap.set(t.id, {
+          id: t.id,
+          posteId: t.posteId,
+          posteCodigo: t.posteCodigo,
+          posteUbicacion: t.posteUbicacion,
+          tecnicoId: t.tecnicoId,
+          supervisorId: t.supervisorId,
+          fechaAsignacion: t.fechaAsignacion,
+          fechaEjecucion: t.fechaEjecucion,
+          estado: t.estado,
+          syncStatus: 'synced'
+        })
+      })
+    }
+    
+    // Agregar inspecciones locales pendientes de sincronización
+    inspeccionesLocales.forEach(local => {
+      if (local.syncStatus === 'pending') {
+        // Usar ID negativo temporal para inspecciones locales
+        const tempId = local.id || -(Date.now())
+        
+        tareasMap.set(tempId, {
+          id: tempId,
+          posteId: local.posteId,
+          posteCodigo: `Poste #${local.posteId}`,
+          posteUbicacion: 'Guardado offline',
+          tecnicoId: local.tecnicoId,
+          supervisorId: local.supervisorId,
+          fechaAsignacion: local.fechaAsignacion,
+          fechaEjecucion: local.fechaEjecucion,
+          estado: local.estado,
+          syncStatus: 'pending',
+          localId: local.id
+        })
+      }
+    })
+    
+    tareas.value = Array.from(tareasMap.values())
+      .sort((a, b) => {
+        // Mostrar pendientes de sync primero
+        if (a.syncStatus === 'pending' && b.syncStatus !== 'pending') return -1
+        if (a.syncStatus !== 'pending' && b.syncStatus === 'pending') return 1
+        // Luego por fecha
+        return new Date(b.fechaAsignacion).getTime() - new Date(a.fechaAsignacion).getTime()
+      })
+    
+    console.log(`📊 Total de tareas mostradas: ${tareas.value.length}`)
+    
+    if (!apiDisponible && tareas.value.length === 0) {
+      throw new Error('No hay conexión y no hay tareas guardadas localmente')
+    }
   } catch (err: any) {
     console.error('Error cargando tareas:', err)
-    error.value = err.response?.data?.error || 'Error al cargar las tareas'
+    error.value = err.message || 'Error al cargar las tareas'
   } finally {
     loading.value = false
   }
 }
 
 const sincronizarTareas = async () => {
+  console.log('🔄 Iniciando sincronización...')
+  
+  // Primero sincronizar inspecciones pendientes
+  await sincronizarInspeccionesPendientes()
+  
+  // Luego cargar tareas actualizadas
   await cargarTareas()
+}
+
+const sincronizarInspeccionesPendientes = async () => {
+  try {
+    const { db } = await import('../db/dexie')
+    
+    // Obtener inspecciones pendientes de sincronización
+    const pendientes = await db.inspecciones
+      .where('syncStatus')
+      .equals('pending')
+      .toArray()
+    
+    if (pendientes.length === 0) {
+      console.log('✅ No hay inspecciones pendientes de sincronizar')
+      return
+    }
+    
+    console.log(`📤 Sincronizando ${pendientes.length} inspecciones pendientes...`)
+    
+    for (const inspeccion of pendientes) {
+      try {
+        console.log(`📤 Sincronizando inspección local ID: ${inspeccion.id}, remoteId: ${inspeccion.remoteId}`)
+        
+        // Convertir firma blob a base64
+        let firmaBase64 = ''
+        if (inspeccion.firma instanceof Blob) {
+          firmaBase64 = await blobToBase64(inspeccion.firma)
+        }
+        
+        // Convertir fotos blobs a base64
+        const fotosBase64: string[] = []
+        for (let i = 0; i < 10; i++) {
+          const fotoKey = `foto${i}` as keyof typeof inspeccion
+          const foto = inspeccion[fotoKey]
+          if (foto instanceof Blob) {
+            const fotoB64 = await blobToBase64(foto)
+            fotosBase64.push(fotoB64)
+          }
+        }
+        
+        // Preparar datos para enviar al servidor
+        const dataParaServidor = {
+          fechaEjecucion: inspeccion.fechaEjecucion,
+          estado: inspeccion.estado,
+          altura: inspeccion.altura,
+          estadoPintura: inspeccion.estadoPintura,
+          colorId: inspeccion.colorId,
+          funcionando: inspeccion.funcionando,
+          estadoBase: inspeccion.estadoBase,
+          observaciones: inspeccion.observaciones,
+          fotos: JSON.stringify(fotosBase64),
+          latReal: inspeccion.latReal,
+          lngReal: inspeccion.lngReal,
+          firma: firmaBase64
+        }
+        
+        // ACTUALIZAR el registro existente usando el remoteId
+        if (inspeccion.remoteId) {
+          await api.put(`/inspecciones/${inspeccion.remoteId}`, dataParaServidor)
+          console.log(`✅ Inspección actualizada. ID remoto: ${inspeccion.remoteId}`)
+          
+          // Marcar como sincronizada en IndexedDB
+          await db.inspecciones.update(inspeccion.id!, {
+            syncStatus: 'synced'
+          })
+        } else {
+          console.warn(`⚠️ Inspección ${inspeccion.id} no tiene remoteId, no se puede sincronizar`)
+        }
+        
+      } catch (syncError) {
+        console.error(`❌ Error sincronizando inspección ${inspeccion.id}:`, syncError)
+        // Continuar con la siguiente inspección
+      }
+    }
+    
+    console.log('✅ Sincronización completada')
+    
+  } catch (error) {
+    console.error('❌ Error en sincronización:', error)
+  }
+}
+
+// Función helper para convertir Blob a base64
+const blobToBase64 = (blob: Blob): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const result = reader.result as string
+      resolve(result)
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
 }
 
 const iniciarInspeccion = (tarea: any) => {
@@ -174,7 +358,7 @@ const continuarInspeccion = (tarea: any) => {
 }
 
 const verDetalles = (tarea: any) => {
-  router.push(`/inspeccion/${tarea.id}`)
+  router.push(`/inspeccion/${tarea.id}/detalle`)
 }
 
 const logout = () => {
@@ -190,6 +374,13 @@ onMounted(() => {
   }
 
   cargarTareas()
+  
+  // Sincronizar automáticamente cuando se detecte conexión
+  window.addEventListener('online', async () => {
+    console.log('🌐 Conexión restaurada - iniciando sincronización automática...')
+    await sincronizarInspeccionesPendientes()
+    await cargarTareas()
+  })
 })
 </script>
 
@@ -197,6 +388,7 @@ onMounted(() => {
 .inspecciones-page {
   min-height: 100vh;
   background: #f5f5f5;
+  padding-top: 0; /* El offline indicator se ajusta automáticamente */
 }
 
 .page-header {
@@ -206,6 +398,9 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
 .page-header h1 {
@@ -318,6 +513,22 @@ onMounted(() => {
   border-radius: 10px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   transition: transform 0.2s;
+  position: relative;
+}
+
+.sync-indicator {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: #ff9800;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .tarea-card:hover {

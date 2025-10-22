@@ -207,6 +207,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import api from '../services/api'
+import { db, savePostesToLocal } from '../db/dexie'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -256,8 +257,28 @@ const formatDate = (date: string) => {
 const loadPostes = async () => {
   try {
     const companyId = authStore.user?.companyId
-    const response = await api.get(`/postes?companyId=${companyId}`)
-    postes.value = response.data
+    
+    try {
+      const response = await api.get(`/postes?companyId=${companyId}`)
+      postes.value = response.data
+      
+      // Guardar en IndexedDB para uso offline
+      await savePostesToLocal(response.data)
+      console.log(`✅ ${postes.value.length} postes cargados y guardados localmente`)
+    } catch (apiError) {
+      console.warn('⚠️ API no disponible, cargando postes desde IndexedDB...')
+      const localPostes = await db.postes.toArray()
+      postes.value = localPostes.map(p => ({
+        id: p.remoteId || p.id,
+        codigo: p.codigo,
+        direccion: p.direccion,
+        tipo: p.tipo,
+        lat: p.lat,
+        lng: p.lng,
+        companyId: p.companyId
+      }))
+      console.log(`💾 ${postes.value.length} postes cargados desde IndexedDB`)
+    }
   } catch (error) {
     console.error('Error cargando postes:', error)
   }

@@ -39,10 +39,19 @@ export const useAuthStore = defineStore('auth', () => {
     const savedToken = localStorage.getItem('token')
     const savedUser = localStorage.getItem('user')
     
+    console.log('Loading from storage:', { 
+      hasToken: !!savedToken, 
+      hasUser: !!savedUser,
+      savedUser: savedUser ? JSON.parse(savedUser) : null
+    })
+    
     if (savedToken && savedUser) {
       token.value = savedToken
       user.value = JSON.parse(savedUser)
       api.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`
+      console.log('Auth restored from localStorage:', user.value)
+    } else {
+      console.log('No auth data in localStorage')
     }
   }
 

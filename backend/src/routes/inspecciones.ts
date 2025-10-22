@@ -56,7 +56,7 @@ router.post('/', async (req: Request, res: Response) => {
       [
         posteId, tecnicoId, supervisorId, estado, altura, estadoPintura,
         colorId, funcionando, estadoBase, observaciones, 
-        fotos ? JSON.stringify(fotos) : null,
+        fotos, // Ya viene como string JSON o null
         latReal, lngReal, firma, fechaEjecucion, 'synced'
       ]
     )
@@ -126,7 +126,11 @@ router.get('/:id', async (req: Request, res: Response) => {
     const { id } = req.params
 
     const [rows] = await pool.query<InspeccionRow[]>(
-      'SELECT * FROM Inspeccion WHERE id = ?',
+      `SELECT i.*, p.codigo as posteCodigo, p.direccion as posteUbicacion, c.name as colorNombre
+       FROM Inspeccion i
+       LEFT JOIN Poste p ON i.posteId = p.id
+       LEFT JOIN Color c ON i.colorId = c.id
+       WHERE i.id = ?`,
       [id]
     )
 
@@ -169,7 +173,7 @@ router.put('/:id', async (req: Request, res: Response) => {
       WHERE id = ?`,
       [
         estado, altura, estadoPintura, colorId, funcionando, estadoBase,
-        observaciones, fotos ? JSON.stringify(fotos) : null,
+        observaciones, fotos, // Ya viene como string JSON desde el frontend
         latReal, lngReal, firma, fechaEjecucion, id
       ]
     )
@@ -204,7 +208,7 @@ router.post('/sync', async (req: Request, res: Response) => {
             insp.posteId, insp.tecnicoId, insp.supervisorId, insp.estado,
             insp.altura, insp.estadoPintura, insp.colorId, insp.funcionando,
             insp.estadoBase, insp.observaciones,
-            insp.fotos ? JSON.stringify(insp.fotos) : null,
+            insp.fotos, // Ya viene como string JSON
             insp.latReal, insp.lngReal, insp.firma, insp.fechaEjecucion, 'synced'
           ]
         )

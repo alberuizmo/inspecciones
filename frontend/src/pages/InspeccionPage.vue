@@ -64,9 +64,22 @@
 
       <div class="form-group">
         <label>Fotos del Poste</label>
-        <button type="button" @click="tomarFoto">📷 Tomar Foto</button>
-        <div v-if="inspeccion.fotos.length > 0">
-          <p>{{ inspeccion.fotos.length }} foto(s) capturada(s)</p>
+        <input 
+          type="file" 
+          accept="image/*" 
+          multiple 
+          capture="environment"
+          @change="seleccionarFotos"
+          ref="inputFotos"
+        />
+        <div v-if="inspeccion.fotos.length > 0" class="fotos-preview">
+          <p>{{ inspeccion.fotos.length }} foto(s) seleccionada(s)</p>
+          <div class="fotos-grid">
+            <div v-for="(foto, index) in inspeccion.fotos" :key="index" class="foto-item">
+              <img :src="foto" alt="Foto" />
+              <button type="button" @click="eliminarFoto(index)">❌</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -90,13 +103,18 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
 import api from '../services/api'
-import db from '../db/dexie'
+import { db, saveColoresToLocal } from '../db/dexie'
 
 const router = useRouter()
 const route = useRoute()
+const authStore = useAuthStore()
 
+const inspeccionId = ref<number>(0)
+const posteId = ref<number>(0)
 const colores = ref<any[]>([])
+const inputFotos = ref<HTMLInputElement | null>(null)
 const canvasFirma = ref<HTMLCanvasElement | null>(null)
 let dibujando = false
 let ctx: CanvasRenderingContext2D | null = null
@@ -134,31 +152,89 @@ const obtenerUbicacion = () => {
   }
 }
 
-const tomarFoto = async () => {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-    const video = document.createElement('video')
-    video.srcObject = stream
-    video.play()
-
-    // Esperar que el video esté listo
-    await new Promise(resolve => {
-      video.onloadedmetadata = resolve
-    })
-
-    const canvas = document.createElement('canvas')
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
-    canvas.getContext('2d')?.drawImage(video, 0, 0)
+const seleccionarFotos = async (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const files = target.files
+  
+  if (!files || files.length === 0) return
+  
+  console.log(`📸 Procesando ${files.length} foto(s)...`)
+  
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i]
     
-    const fotoBase64 = canvas.toDataURL('image/jpeg', 0.8)
-    inspeccion.value.fotos.push(fotoBase64)
+    console.log(`📸 Archivo ${i + 1}: ${file.name}, Tamaño: ${(file.size / 1024).toFixed(2)} KB`)
     
-    stream.getTracks().forEach(track => track.stop())
-  } catch (error) {
-    console.error('Error al tomar foto:', error)
-    alert('Error al acceder a la cámara')
+    // Limitar tamaño de archivo a 5MB (aumentado)
+    if (file.size > 5 * 1024 * 1024) {
+      alert(`La foto ${file.name} es muy grande (máx 5MB)`)
+      continue
+    }
+    
+    try {
+      // Redimensionar y comprimir la imagen (más calidad: 0.8)
+      const fotoBase64 = await redimensionarImagen(file, 1200, 0.8)
+      inspeccion.value.fotos.push(fotoBase64)
+      console.log(`✅ Foto ${i + 1} agregada - Tamaño final: ${(fotoBase64.length / 1024).toFixed(2)} KB`)
+    } catch (error) {
+      console.error('❌ Error procesando foto:', error)
+      alert('Error al procesar la foto: ' + (error instanceof Error ? error.message : 'Error desconocido'))
+    }
   }
+  
+  console.log(`📸 Total de fotos agregadas: ${inspeccion.value.fotos.length}`)
+  
+  // Limpiar input para permitir seleccionar las mismas fotos de nuevo
+  if (inputFotos.value) {
+    inputFotos.value.value = ''
+  }
+}
+
+const redimensionarImagen = (file: File, maxWidth: number, quality: number): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    
+    reader.onload = (e) => {
+      const img = new Image()
+      
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        let width = img.width
+        let height = img.height
+        
+        // Redimensionar manteniendo proporción
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width
+          width = maxWidth
+        }
+        
+        canvas.width = width
+        canvas.height = height
+        
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          reject(new Error('No se pudo obtener contexto del canvas'))
+          return
+        }
+        
+        ctx.drawImage(img, 0, 0, width, height)
+        
+        // Convertir a base64 con compresión
+        const base64 = canvas.toDataURL('image/jpeg', quality)
+        resolve(base64)
+      }
+      
+      img.onerror = () => reject(new Error('Error cargando imagen'))
+      img.src = e.target?.result as string
+    }
+    
+    reader.onerror = () => reject(new Error('Error leyendo archivo'))
+    reader.readAsDataURL(file)
+  })
+}
+
+const eliminarFoto = (index: number) => {
+  inspeccion.value.fotos.splice(index, 1)
 }
 
 const iniciarFirma = (e: MouseEvent | TouchEvent) => {
@@ -215,37 +291,149 @@ const guardarInspeccion = async () => {
   }
 
   try {
-    // Guardar en IndexedDB para sincronización posterior
-    await db.table('inspecciones').add({
-      ...inspeccion.value,
-      posteId: Number(route.params.id),
-      tecnicoId: 1, // TODO: get from auth store
-      fechaEjecucion: new Date().toISOString(),
-      estado: 'completada',
-      syncStatus: 'pending',
-      lastModified: new Date().toISOString()
-    })
+    const tecnicoId = authStore.user?.id
+    if (!tecnicoId) {
+      throw new Error('No se encontró el ID del técnico')
+    }
 
-    alert('Inspección guardada localmente. Se sincronizará cuando haya conexión.')
-    router.push('/inspecciones')
+    // Intentar guardar en servidor primero
+    try {
+      // Para el servidor, crear objeto limpio
+      const dataParaServidor = {
+        fechaEjecucion: new Date().toISOString(),
+        estado: 'completada',
+        altura: inspeccion.value.altura,
+        estadoPintura: inspeccion.value.estadoPintura,
+        colorId: inspeccion.value.colorId,
+        funcionando: inspeccion.value.funcionando,
+        estadoBase: inspeccion.value.estadoBase,
+        observaciones: inspeccion.value.observaciones,
+        fotos: JSON.stringify(inspeccion.value.fotos), // JSON string para API
+        latReal: inspeccion.value.latReal,
+        lngReal: inspeccion.value.lngReal,
+        firma: inspeccion.value.firma
+      }
+      
+      console.log('📤 Enviando inspección al servidor:', dataParaServidor)
+      console.log('📸 Número de fotos:', inspeccion.value.fotos.length)
+      
+      // ACTUALIZAR el registro existente con PUT
+      await api.put(`/inspecciones/${route.params.id}`, dataParaServidor)
+      alert('✅ Inspección guardada exitosamente')
+      router.push('/inspecciones')
+    } catch (apiError) {
+      // Si falla la API, guardar solo en IndexedDB
+      console.warn('⚠️ No hay conexión, guardando solo localmente...', apiError)
+      
+      try {
+        console.log('💾 Guardando inspección offline...')
+        
+        // Crear objeto literal plano sin firma ni fotos primero
+        const plainObject: any = {
+          remoteId: inspeccionId.value, // ID de la inspección asignada
+          posteId: posteId.value, // ID del poste
+          tecnicoId: parseInt(String(tecnicoId)),
+          supervisorId: null,
+          fechaAsignacion: String(new Date().toISOString()),
+          fechaEjecucion: String(new Date().toISOString()),
+          estado: 'completada' as const,
+          altura: inspeccion.value.altura ? parseFloat(String(inspeccion.value.altura)) : null,
+          estadoPintura: String(inspeccion.value.estadoPintura || ''),
+          colorId: inspeccion.value.colorId ? parseInt(String(inspeccion.value.colorId)) : null,
+          funcionando: Boolean(inspeccion.value.funcionando),
+          estadoBase: String(inspeccion.value.estadoBase || ''),
+          observaciones: String(inspeccion.value.observaciones || ''),
+          latReal: parseFloat(String(inspeccion.value.latReal)),
+          lngReal: parseFloat(String(inspeccion.value.lngReal)),
+          syncStatus: 'pending' as const,
+          lastModified: String(new Date().toISOString()),
+          fotosCount: inspeccion.value.fotos.length
+        }
+        
+        const id = await db.inspecciones.add(plainObject)
+        console.log('✅ Inspección guardada con ID:', id)
+        
+        // Guardar firma como blob si existe
+        if (inspeccion.value.firma) {
+          console.log('📝 Guardando firma como blob...')
+          const base64Data = inspeccion.value.firma.split(',')[1]
+          const byteCharacters = atob(base64Data)
+          const byteNumbers = new Array(byteCharacters.length)
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i)
+          }
+          const byteArray = new Uint8Array(byteNumbers)
+          const firmaBlob = new Blob([byteArray], { type: 'image/png' })
+          await db.inspecciones.update(id, { firma: firmaBlob })
+          console.log('✅ Firma guardada')
+        }
+        
+        // Guardar fotos como blobs si existen
+        if (inspeccion.value.fotos.length > 0) {
+          console.log(`📸 Guardando ${inspeccion.value.fotos.length} fotos...`)
+          
+          // Guardar cada foto por separado (no en array)
+          for (let i = 0; i < inspeccion.value.fotos.length; i++) {
+            const fotoBase64 = inspeccion.value.fotos[i]
+            const base64Data = fotoBase64.split(',')[1]
+            const byteCharacters = atob(base64Data)
+            const byteNumbers = new Array(byteCharacters.length)
+            for (let j = 0; j < byteCharacters.length; j++) {
+              byteNumbers[j] = byteCharacters.charCodeAt(j)
+            }
+            const byteArray = new Uint8Array(byteNumbers)
+            const fotoBlob = new Blob([byteArray], { type: 'image/jpeg' })
+            
+            // Guardar cada foto en un campo separado
+            const updateObj: Record<string, Blob> = {}
+            updateObj[`foto${i}`] = fotoBlob
+            await db.inspecciones.update(id, updateObj)
+            console.log(`✅ Foto ${i + 1} guardada`)
+          }
+        }
+        
+        alert('💾 Inspección guardada localmente. Se sincronizará cuando haya conexión.')
+        router.push('/inspecciones')
+      } catch (dbError) {
+        console.error('❌ Error de IndexedDB:', dbError)
+        alert('Error al guardar offline: ' + (dbError instanceof Error ? dbError.message : 'Error desconocido'))
+      }
+    }
   } catch (error) {
     console.error('Error al guardar:', error)
-    alert('Error al guardar la inspección')
+    alert('❌ Error al guardar la inspección: ' + (error instanceof Error ? error.message : 'Error desconocido'))
   }
 }
 
 onMounted(async () => {
+  // Cargar la inspección asignada para obtener el posteId
+  try {
+    const response = await api.get(`/inspecciones/${route.params.id}`)
+    inspeccionId.value = response.data.id
+    posteId.value = response.data.posteId
+    console.log(`📋 Inspección cargada - ID: ${inspeccionId.value}, Poste: ${posteId.value}`)
+  } catch (error) {
+    console.error('Error cargando inspección:', error)
+    alert('Error al cargar la inspección')
+    router.push('/inspecciones')
+    return
+  }
+
   // Cargar colores desde API o IndexedDB
   try {
     const response = await api.get('/colores')
     colores.value = response.data
     
     // Guardar en IndexedDB para offline
-    await db.table('colores').clear()
-    await db.table('colores').bulkAdd(response.data)
+    await saveColoresToLocal(response.data)
   } catch (error) {
     // Si no hay conexión, cargar desde IndexedDB
-    colores.value = await db.table('colores').toArray()
+    console.warn('⚠️ Cargando colores desde IndexedDB...')
+    const localColores = await db.colores.toArray()
+    colores.value = localColores.map(c => ({
+      id: c.remoteId || c.id,
+      name: c.name
+    }))
   }
 
   // Inicializar canvas para firma
@@ -289,6 +477,43 @@ input, select, textarea {
   font-size: 16px;
   border: 1px solid #ccc;
   border-radius: 4px;
+}
+input[type="file"] {
+  padding: 5px;
+}
+.fotos-preview {
+  margin-top: 15px;
+}
+.fotos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+.foto-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid #ddd;
+}
+.foto-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.foto-item button {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background: rgba(255, 0, 0, 0.8);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  font-size: 12px;
 }
 canvas {
   border: 2px solid #000;
