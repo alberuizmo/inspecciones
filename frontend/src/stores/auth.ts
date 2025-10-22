@@ -55,5 +55,18 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  return { user, token, login, logout, loadFromStorage }
+  const setUser = (userData: User) => {
+    user.value = userData
+    localStorage.setItem('user', JSON.stringify(userData))
+    console.log('User set:', userData)
+  }
+
+  const setToken = (tokenValue: string) => {
+    token.value = tokenValue
+    localStorage.setItem('token', tokenValue)
+    api.defaults.headers.common['Authorization'] = `Bearer ${tokenValue}`
+    console.log('Token set')
+  }
+
+  return { user, token, login, logout, loadFromStorage, setUser, setToken }
 })

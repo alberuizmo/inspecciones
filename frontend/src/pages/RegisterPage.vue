@@ -119,18 +119,30 @@ const register = async () => {
       companyAddress: '', // Opcional por ahora
       companyPhone: ''    // Opcional por ahora
     })
-    console.log('✅ Respuesta del servidor:', response.data)
+    
+    console.log('✅ Respuesta completa:', response)
+    console.log('✅ Data:', response.data)
+    console.log('✅ Token:', response.data?.token)
+    console.log('✅ User:', response.data?.user)
 
     // Guardar token y usuario automáticamente
-    if (response.data.token) {
+    if (response.data && response.data.token) {
+      console.log('💾 Guardando token y usuario...')
+      authStore.setToken(response.data.token)
       authStore.setUser(response.data.user)
-      localStorage.setItem('token', response.data.token)
       
+      console.log('🚀 Redirigiendo a dashboard...')
       // Redirigir al dashboard de admin
-      router.push('/admin/dashboard')
+      await router.push('/admin/dashboard')
+      console.log('✅ Registro exitoso!')
+    } else {
+      console.error('❌ No se recibió token en la respuesta')
+      error.value = 'Error: No se recibió token de autenticación'
     }
   } catch (err: any) {
-    console.error('Error en registro:', err)
+    console.error('❌ Error en registro:', err)
+    console.error('❌ Error response:', err.response)
+    console.error('❌ Error data:', err.response?.data)
     error.value = err.response?.data?.error || 'Error al crear la cuenta'
   } finally {
     loading.value = false
