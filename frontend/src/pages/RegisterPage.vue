@@ -173,6 +173,7 @@ h1 {
   margin: 0 0 10px 0;
   color: #333;
   text-align: center;
+  font-size: 2rem;
 }
 
 .subtitle {
