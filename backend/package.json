@@ -7,7 +7,8 @@
     "start": "node dist/index.js",
     "build": "tsc -p tsconfig.json",
     "db:setup": "ts-node src/db/setup.ts",
-    "db:migrate": "ts-node src/db/migrate.ts",
+    "db:migrate": "node dist/db/migrate.js",
+    "db:migrate:dev": "ts-node src/db/migrate.ts",
     "postinstall": "npm run build",
     "heroku-postbuild": "npm run build"
   },
