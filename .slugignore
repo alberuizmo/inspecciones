@@ -1,0 +1,2 @@
+# Archivo para indicarle a Heroku que construya solo el backend
+# Este archivo no es necesario si usas heroku-monorepo buildpack

@@ -11,7 +11,28 @@ import pool from './db/connection'
 dotenv.config()
 
 const app = express()
-app.use(cors())
+
+// Configurar CORS para permitir el frontend
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'https://inspecciones-frontend.herokuapp.com'
+]
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Permitir requests sin origin (mobile apps, Postman, etc)
+    if (!origin) return callback(null, true)
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true)
+    } else {
+      callback(new Error('Not allowed by CORS'))
+    }
+  },
+  credentials: true
+}))
+
 app.use(express.json({ limit: '50mb' }))
 app.use(express.urlencoded({ limit: '50mb', extended: true }))
 
