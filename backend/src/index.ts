@@ -16,7 +16,9 @@ const app = express()
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
-  'https://inspecciones-frontend.herokuapp.com'
+  'https://inspecciones-frontend.herokuapp.com',
+  'https://inspecciones-frontend-97cbfbf0a532.herokuapp.com',
+  'https://inspecciones-frontend-97cbfbf0a532.herokuapp.app'
 ]
 
 app.use(cors({
@@ -27,6 +29,8 @@ app.use(cors({
     if (allowedOrigins.includes(origin)) {
       callback(null, true)
     } else {
+      // Log para debugging
+      console.log('❌ CORS blocked origin:', origin)
       callback(new Error('Not allowed by CORS'))
     }
   },
