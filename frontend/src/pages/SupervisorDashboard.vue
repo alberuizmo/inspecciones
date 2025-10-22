@@ -415,6 +415,9 @@ onMounted(() => {
 </script>
 
 <style scoped>
+h2 {
+  font-size: 1.8rem;
+}
 .supervisor-dashboard {
   min-height: 100vh;
   background: #f5f5f5;
@@ -432,6 +435,7 @@ onMounted(() => {
 .dashboard-header h1 {
   margin: 0;
   color: #000;
+  font-size: 1.8rem;
 }
 
 .header-actions {
@@ -654,5 +658,149 @@ onMounted(() => {
   border: none;
   border-radius: 5px;
   cursor: pointer;
+}
+
+/* Media Queries para Móvil */
+@media (max-width: 768px) {
+  .dashboard-header {
+    padding: 15px 20px;
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .dashboard-header h1 {
+    font-size: 1.4rem;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .user-info {
+    font-size: 14px;
+  }
+
+  .btn-logout {
+    padding: 8px 16px;
+    font-size: 14px;
+  }
+
+  .dashboard-content {
+    padding: 20px 15px;
+  }
+
+  .tabs {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .tabs button {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 15px;
+  }
+
+  .tab-content {
+    padding: 20px 15px;
+  }
+
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+
+  .section-header h2 {
+    font-size: 1.2rem;
+  }
+
+  .btn-primary {
+    width: 100%;
+    padding: 10px 20px;
+    font-size: 15px;
+  }
+
+  .data-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 10px 8px;
+    font-size: 14px;
+  }
+
+  .btn-success-sm,
+  .btn-edit-sm,
+  .btn-danger-sm {
+    padding: 5px 10px;
+    font-size: 12px;
+    margin-right: 3px;
+  }
+
+  .modal-content {
+    padding: 25px 20px;
+    max-width: 95%;
+  }
+
+  .modal-content h2 {
+    font-size: 1.3rem;
+  }
+
+  .subtitle {
+    font-size: 14px;
+  }
+
+  .form-group input,
+  .form-group select {
+    font-size: 15px;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+  }
+
+  .modal-actions button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-header h1 {
+    font-size: 1.2rem;
+  }
+
+  .section-header h2 {
+    font-size: 1.1rem;
+  }
+
+  .tabs button {
+    font-size: 14px;
+    padding: 10px 14px;
+  }
+
+  .data-table th,
+  .data-table td {
+    font-size: 13px;
+    padding: 8px 6px;
+  }
+
+  .status-badge {
+    font-size: 12px;
+    padding: 3px 10px;
+  }
+
+  .modal-content h2 {
+    font-size: 1.1rem;
+  }
 }
 </style>

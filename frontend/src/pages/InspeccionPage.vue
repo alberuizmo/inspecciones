@@ -113,6 +113,8 @@ const authStore = useAuthStore()
 
 const inspeccionId = ref<number>(0)
 const posteId = ref<number>(0)
+const posteCodigo = ref<string>('')
+const posteUbicacion = ref<string>('')
 const colores = ref<any[]>([])
 const inputFotos = ref<HTMLInputElement | null>(null)
 const canvasFirma = ref<HTMLCanvasElement | null>(null)
@@ -328,30 +330,68 @@ const guardarInspeccion = async () => {
       try {
         console.log('💾 Guardando inspección offline...')
         
-        // Crear objeto literal plano sin firma ni fotos primero
-        const plainObject: any = {
-          remoteId: inspeccionId.value, // ID de la inspección asignada
-          posteId: posteId.value, // ID del poste
-          tecnicoId: parseInt(String(tecnicoId)),
-          supervisorId: null,
-          fechaAsignacion: String(new Date().toISOString()),
-          fechaEjecucion: String(new Date().toISOString()),
-          estado: 'completada' as const,
-          altura: inspeccion.value.altura ? parseFloat(String(inspeccion.value.altura)) : null,
-          estadoPintura: String(inspeccion.value.estadoPintura || ''),
-          colorId: inspeccion.value.colorId ? parseInt(String(inspeccion.value.colorId)) : null,
-          funcionando: Boolean(inspeccion.value.funcionando),
-          estadoBase: String(inspeccion.value.estadoBase || ''),
-          observaciones: String(inspeccion.value.observaciones || ''),
-          latReal: parseFloat(String(inspeccion.value.latReal)),
-          lngReal: parseFloat(String(inspeccion.value.lngReal)),
-          syncStatus: 'pending' as const,
-          lastModified: String(new Date().toISOString()),
-          fotosCount: inspeccion.value.fotos.length
-        }
+        // Buscar si ya existe una inspección local con este remoteId
+        const inspeccionExistente = await db.inspecciones
+          .where('remoteId')
+          .equals(inspeccionId.value)
+          .first()
         
-        const id = await db.inspecciones.add(plainObject)
-        console.log('✅ Inspección guardada con ID:', id)
+        let localId: number
+        
+        if (inspeccionExistente) {
+          // ACTUALIZAR el registro existente
+          console.log(`🔄 Actualizando inspección local existente (ID: ${inspeccionExistente.id})`)
+          localId = inspeccionExistente.id!
+          
+          await db.inspecciones.update(localId, {
+            fechaEjecucion: String(new Date().toISOString()),
+            estado: 'completada' as const,
+            altura: inspeccion.value.altura ? parseFloat(String(inspeccion.value.altura)) : null,
+            estadoPintura: String(inspeccion.value.estadoPintura || ''),
+            colorId: inspeccion.value.colorId ? parseInt(String(inspeccion.value.colorId)) : null,
+            funcionando: Boolean(inspeccion.value.funcionando),
+            estadoBase: String(inspeccion.value.estadoBase || ''),
+            observaciones: String(inspeccion.value.observaciones || ''),
+            latReal: parseFloat(String(inspeccion.value.latReal)),
+            lngReal: parseFloat(String(inspeccion.value.lngReal)),
+            syncStatus: 'pending' as const,
+            lastModified: String(new Date().toISOString()),
+            fotosCount: inspeccion.value.fotos.length,
+            posteCodigo: posteCodigo.value,
+            posteUbicacion: posteUbicacion.value
+          })
+          
+          console.log('✅ Inspección actualizada')
+        } else {
+          // CREAR nuevo registro solo si no existe
+          console.log('➕ Creando nueva inspección local')
+          
+          const plainObject: any = {
+            remoteId: inspeccionId.value,
+            posteId: posteId.value,
+            posteCodigo: posteCodigo.value,
+            posteUbicacion: posteUbicacion.value,
+            tecnicoId: parseInt(String(tecnicoId)),
+            supervisorId: null,
+            fechaAsignacion: String(new Date().toISOString()),
+            fechaEjecucion: String(new Date().toISOString()),
+            estado: 'completada' as const,
+            altura: inspeccion.value.altura ? parseFloat(String(inspeccion.value.altura)) : null,
+            estadoPintura: String(inspeccion.value.estadoPintura || ''),
+            colorId: inspeccion.value.colorId ? parseInt(String(inspeccion.value.colorId)) : null,
+            funcionando: Boolean(inspeccion.value.funcionando),
+            estadoBase: String(inspeccion.value.estadoBase || ''),
+            observaciones: String(inspeccion.value.observaciones || ''),
+            latReal: parseFloat(String(inspeccion.value.latReal)),
+            lngReal: parseFloat(String(inspeccion.value.lngReal)),
+            syncStatus: 'pending' as const,
+            lastModified: String(new Date().toISOString()),
+            fotosCount: inspeccion.value.fotos.length
+          }
+          
+          localId = await db.inspecciones.add(plainObject) as number
+          console.log('✅ Inspección creada con ID:', localId)
+        }
         
         // Guardar firma como blob si existe
         if (inspeccion.value.firma) {
@@ -364,7 +404,7 @@ const guardarInspeccion = async () => {
           }
           const byteArray = new Uint8Array(byteNumbers)
           const firmaBlob = new Blob([byteArray], { type: 'image/png' })
-          await db.inspecciones.update(id, { firma: firmaBlob })
+          await db.inspecciones.update(localId, { firma: firmaBlob })
           console.log('✅ Firma guardada')
         }
         
@@ -372,7 +412,14 @@ const guardarInspeccion = async () => {
         if (inspeccion.value.fotos.length > 0) {
           console.log(`📸 Guardando ${inspeccion.value.fotos.length} fotos...`)
           
-          // Guardar cada foto por separado (no en array)
+          // Limpiar fotos antiguas primero
+          const updateClearFotos: Record<string, undefined> = {}
+          for (let i = 0; i < 10; i++) {
+            updateClearFotos[`foto${i}`] = undefined
+          }
+          await db.inspecciones.update(localId, updateClearFotos)
+          
+          // Guardar cada foto por separado
           for (let i = 0; i < inspeccion.value.fotos.length; i++) {
             const fotoBase64 = inspeccion.value.fotos[i]
             const base64Data = fotoBase64.split(',')[1]
@@ -387,7 +434,7 @@ const guardarInspeccion = async () => {
             // Guardar cada foto en un campo separado
             const updateObj: Record<string, Blob> = {}
             updateObj[`foto${i}`] = fotoBlob
-            await db.inspecciones.update(id, updateObj)
+            await db.inspecciones.update(localId, updateObj)
             console.log(`✅ Foto ${i + 1} guardada`)
           }
         }
@@ -411,7 +458,9 @@ onMounted(async () => {
     const response = await api.get(`/inspecciones/${route.params.id}`)
     inspeccionId.value = response.data.id
     posteId.value = response.data.posteId
-    console.log(`📋 Inspección cargada - ID: ${inspeccionId.value}, Poste: ${posteId.value}`)
+    posteCodigo.value = response.data.posteCodigo || `Poste #${response.data.posteId}`
+    posteUbicacion.value = response.data.posteUbicacion || ''
+    console.log(`📋 Inspección cargada - ID: ${inspeccionId.value}, Poste: ${posteCodigo.value}`)
   } catch (error) {
     console.error('Error cargando inspección:', error)
     alert('Error al cargar la inspección')

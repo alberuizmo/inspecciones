@@ -163,8 +163,8 @@ const cargarTareas = async () => {
       const response = await api.get(`/inspecciones/tecnico/${tecnicoId}`)
       tareasFromAPI = response.data
       
-      // Guardar en IndexedDB para uso offline
-      await saveInspeccionesToLocal(response.data)
+      // NO guardar en IndexedDB - las inspecciones completadas están en el servidor
+      // Solo IndexedDB guarda inspecciones pendientes de sincronización
       
       console.log(`✅ ${tareasFromAPI.length} tareas cargadas desde API`)
     } catch (apiError: any) {
@@ -181,38 +181,52 @@ const cargarTareas = async () => {
     
     console.log(`💾 ${inspeccionesLocales.length} inspecciones locales encontradas`)
 
+    // Crear Set de remoteIds que tienen versión local pendiente
+    const remoteIdsConVersionLocal = new Set(
+      inspeccionesLocales
+        .filter(local => local.syncStatus === 'pending' && local.remoteId)
+        .map(local => local.remoteId)
+    )
+    
+    console.log(`🔍 IDs con versión local pendiente:`, Array.from(remoteIdsConVersionLocal))
+
     // Combinar tareas del API con inspecciones locales
     const tareasMap = new Map()
     
-    // Agregar tareas del API
+    // Agregar tareas del API (EXCEPTO las que tienen versión local pendiente)
     if (apiDisponible) {
       tareasFromAPI.forEach(t => {
-        tareasMap.set(t.id, {
-          id: t.id,
-          posteId: t.posteId,
-          posteCodigo: t.posteCodigo,
-          posteUbicacion: t.posteUbicacion,
-          tecnicoId: t.tecnicoId,
-          supervisorId: t.supervisorId,
-          fechaAsignacion: t.fechaAsignacion,
-          fechaEjecucion: t.fechaEjecucion,
-          estado: t.estado,
-          syncStatus: 'synced'
-        })
+        // Solo agregar si NO tiene una versión local pendiente de sincronización
+        if (!remoteIdsConVersionLocal.has(t.id)) {
+          tareasMap.set(t.id, {
+            id: t.id,
+            posteId: t.posteId,
+            posteCodigo: t.posteCodigo,
+            posteUbicacion: t.posteUbicacion,
+            tecnicoId: t.tecnicoId,
+            supervisorId: t.supervisorId,
+            fechaAsignacion: t.fechaAsignacion,
+            fechaEjecucion: t.fechaEjecucion,
+            estado: t.estado,
+            syncStatus: 'synced'
+          })
+        } else {
+          console.log(`⏭️ Omitiendo inspección ${t.id} del servidor (tiene versión local pendiente)`)
+        }
       })
     }
     
     // Agregar inspecciones locales pendientes de sincronización
     inspeccionesLocales.forEach(local => {
       if (local.syncStatus === 'pending') {
-        // Usar ID negativo temporal para inspecciones locales
-        const tempId = local.id || -(Date.now())
+        // Usar el remoteId como ID para mostrar en la lista
+        const displayId = local.remoteId || local.id || -(Date.now())
         
-        tareasMap.set(tempId, {
-          id: tempId,
+        tareasMap.set(displayId, {
+          id: displayId,
           posteId: local.posteId,
-          posteCodigo: `Poste #${local.posteId}`,
-          posteUbicacion: 'Guardado offline',
+          posteCodigo: local.posteCodigo || `Poste #${local.posteId}`,
+          posteUbicacion: local.posteUbicacion || 'Guardado offline',
           tecnicoId: local.tecnicoId,
           supervisorId: local.supervisorId,
           fechaAsignacion: local.fechaAsignacion,
@@ -315,10 +329,9 @@ const sincronizarInspeccionesPendientes = async () => {
           await api.put(`/inspecciones/${inspeccion.remoteId}`, dataParaServidor)
           console.log(`✅ Inspección actualizada. ID remoto: ${inspeccion.remoteId}`)
           
-          // Marcar como sincronizada en IndexedDB
-          await db.inspecciones.update(inspeccion.id!, {
-            syncStatus: 'synced'
-          })
+          // ELIMINAR de IndexedDB después de sincronizar exitosamente
+          await db.inspecciones.delete(inspeccion.id!)
+          console.log(`🗑️ Inspección local eliminada (ya está sincronizada)`)
         } else {
           console.warn(`⚠️ Inspección ${inspeccion.id} no tiene remoteId, no se puede sincronizar`)
         }
@@ -406,6 +419,7 @@ onMounted(() => {
 .page-header h1 {
   margin: 0;
   color: #000;
+  font-size: 1.8rem;
 }
 
 .header-actions {
@@ -548,6 +562,7 @@ onMounted(() => {
 .tarea-header h3 {
   margin: 0;
   color: #333;
+  font-size: 1.3rem;
 }
 
 .estado-badge {
@@ -617,5 +632,135 @@ onMounted(() => {
   font-weight: 600;
   cursor: pointer;
   font-size: 16px;
+}
+
+/* Media Queries para Móvil */
+@media (max-width: 768px) {
+  .page-header {
+    padding: 15px 20px;
+    flex-direction: column;
+    gap: 15px;
+    align-items: stretch;
+  }
+
+  .page-header h1 {
+    font-size: clamp(1.3rem, 5vw, 2rem);
+    text-align: center;
+  }
+
+  .header-actions {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .user-info {
+    width: 100%;
+    text-align: center;
+    font-size: 14px;
+  }
+
+  .btn-sync,
+  .btn-logout {
+    flex: 1;
+    padding: 10px 15px;
+    font-size: 14px;
+  }
+
+  .tareas-section {
+    padding: 20px 15px;
+  }
+
+  .tabs {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .tabs button {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 15px;
+  }
+
+  .tarea-card {
+    padding: 20px 15px;
+  }
+
+  .sync-indicator {
+    position: static;
+    margin-bottom: 15px;
+    font-size: 11px;
+    padding: 5px 10px;
+    display: inline-block;
+  }
+
+  .tarea-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .tarea-header h3 {
+    font-size: 1.2rem;
+  }
+
+  .estado-badge {
+    font-size: 13px;
+    padding: 5px 12px;
+  }
+
+  .tarea-details p {
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .tarea-actions {
+    flex-direction: column;
+  }
+
+  .btn-primary,
+  .btn-warning,
+  .btn-secondary {
+    width: 100%;
+    padding: 12px 20px;
+    font-size: 15px;
+  }
+
+  .empty-state {
+    padding: 40px 20px;
+  }
+
+  .empty-icon {
+    font-size: 48px;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-header h1 {
+    font-size: 1.2rem;
+  }
+
+  .btn-sync,
+  .btn-logout {
+    font-size: 13px;
+    padding: 8px 12px;
+  }
+
+  .tabs button {
+    font-size: 14px;
+    padding: 10px 14px;
+  }
+
+  .tarea-header h3 {
+    font-size: 1.1rem;
+  }
+
+  .tarea-details p {
+    font-size: 13px;
+  }
+
+  .sync-indicator {
+    font-size: 10px;
+  }
 }
 </style>

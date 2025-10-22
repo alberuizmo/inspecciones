@@ -6,7 +6,7 @@
         ⚠️ Sin conexión a internet
       </div>
 
-      <h1>Inspecciones de Postes</h1>
+      <h1 style="">Inspecciones de Postes</h1>
       <p class="subtitle">Sistema de gestión de inspecciones</p>
       
       <form @submit.prevent="login">
@@ -148,6 +148,8 @@ h1 {
   margin: 0 0 10px 0;
   color: #333;
   text-align: center;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  line-height: 1.2;
 }
 
 .subtitle {
@@ -226,5 +228,84 @@ input:focus {
 
 .register-link a:hover {
   text-decoration: underline;
+}
+
+/* Media Queries para Móvil */
+@media (max-width: 768px) {
+  .login-page {
+    padding: 20px;
+    align-items: flex-start;
+    padding-top: 40px;
+  }
+
+  .login-card {
+    padding: 30px 25px;
+    max-width: 100%;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+  }
+
+  .subtitle {
+    font-size: 14px;
+    margin-bottom: 25px;
+  }
+
+  .form-group {
+    margin-bottom: 18px;
+  }
+
+  label {
+    font-size: 14px;
+  }
+
+  input {
+    padding: 12px;
+    font-size: 16px;
+  }
+
+  .btn-login {
+    padding: 14px;
+    font-size: 15px;
+  }
+
+  .offline-banner {
+    font-size: 14px;
+    padding: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-page {
+    padding: 15px;
+    padding-top: 30px;
+  }
+
+  .login-card {
+    padding: 25px 20px;
+  }
+
+  h1 {
+    font-size: 1.3rem;
+  }
+
+  .subtitle {
+    font-size: 13px;
+  }
+
+  input {
+    padding: 10px;
+    font-size: 15px;
+  }
+
+  .btn-login {
+    padding: 12px;
+    font-size: 14px;
+  }
+
+  .register-link {
+    font-size: 14px;
+  }
 }
 </style>

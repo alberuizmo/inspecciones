@@ -251,6 +251,9 @@ onMounted(() => {
 </script>
 
 <style scoped>
+h2 {
+    font-size: 1.8rem;
+  }
 .admin-dashboard {
   min-height: 100vh;
   background: #f5f5f5;
@@ -268,6 +271,7 @@ onMounted(() => {
 .dashboard-header h1 {
   margin: 0;
   color: #000;
+  font-size: 1.4rem;
 }
 
 .header-actions {
@@ -456,5 +460,134 @@ onMounted(() => {
   border: none;
   border-radius: 5px;
   cursor: pointer;
+}
+
+.section-header h2 {
+    font-size: 1.8rem;
+  }
+
+
+
+/* Media Queries para Móvil */
+@media (max-width: 768px) {
+  .dashboard-header {
+    padding: 15px 20px;
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .dashboard-header h1 {
+    font-size: 1.4rem;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .user-info {
+    font-size: 14px;
+  }
+
+  .btn-logout {
+    padding: 8px 16px;
+    font-size: 14px;
+  }
+
+  .dashboard-content {
+    padding: 20px 15px;
+  }
+
+  .tabs {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .tabs button {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 15px;
+  }
+
+  .tab-content {
+    padding: 20px 15px;
+  }
+
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+
+  .section-header h2 {
+    font-size: 1.2rem;
+  }
+
+  .btn-primary {
+    width: 100%;
+    padding: 10px 20px;
+    font-size: 15px;
+  }
+
+  .users-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .users-table th,
+  .users-table td {
+    padding: 10px 8px;
+    font-size: 14px;
+  }
+
+  .modal-content {
+    padding: 25px 20px;
+    max-width: 95%;
+  }
+
+  .modal-content h2 {
+    font-size: 1.3rem;
+  }
+
+  .form-group input,
+  .form-group select {
+    font-size: 15px;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+  }
+
+  .modal-actions button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-header h1 {
+    font-size: 1.2rem;
+  }
+
+  .section-header h2 {
+    font-size: 1.1rem;
+  }
+
+  .tabs button {
+    font-size: 14px;
+    padding: 10px 14px;
+  }
+
+  .users-table th,
+  .users-table td {
+    font-size: 13px;
+    padding: 8px 6px;
+  }
+
+  .role-badge {
+    font-size: 12px;
+    padding: 3px 10px;
+  }
 }
 </style>
