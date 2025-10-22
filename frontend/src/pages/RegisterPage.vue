@@ -109,20 +109,26 @@ const register = async () => {
   loading.value = true
 
   try {
-    // Registrar admin
-    await api.post('/auth/register', {
-      email: form.value.email,
+    console.log('🏢 Registrando empresa y administrador...')
+    // Registrar empresa + admin usando el endpoint correcto
+    const response = await api.post('/auth/register-company', {
+      companyName: form.value.companyName,
       name: form.value.name,
+      email: form.value.email,
       password: form.value.password,
-      role: 'admin',
-      companyId: Date.now() // Temporal, luego se puede mejorar
+      companyAddress: '', // Opcional por ahora
+      companyPhone: ''    // Opcional por ahora
     })
+    console.log('✅ Respuesta del servidor:', response.data)
 
-    // Login automático
-    await authStore.login(form.value.email, form.value.password)
-
-    // Redirigir al dashboard de admin
-    router.push('/admin/dashboard')
+    // Guardar token y usuario automáticamente
+    if (response.data.token) {
+      authStore.setUser(response.data.user)
+      localStorage.setItem('token', response.data.token)
+      
+      // Redirigir al dashboard de admin
+      router.push('/admin/dashboard')
+    }
   } catch (err: any) {
     console.error('Error en registro:', err)
     error.value = err.response?.data?.error || 'Error al crear la cuenta'
