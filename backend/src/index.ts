@@ -12,28 +12,9 @@ dotenv.config()
 
 const app = express()
 
-// Configurar CORS para permitir el frontend
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'https://inspecciones-frontend.herokuapp.com',
-  'https://inspecciones-frontend-97cbfbf0a532.herokuapp.com',
-  'https://inspecciones-frontend-97cbfbf0a532.herokuapp.app'
-]
-
+// Configurar CORS - Permitir todos los orígenes (solo para desarrollo/pruebas)
 app.use(cors({
-  origin: (origin, callback) => {
-    // Permitir requests sin origin (mobile apps, Postman, etc)
-    if (!origin) return callback(null, true)
-    
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true)
-    } else {
-      // Log para debugging
-      console.log('❌ CORS blocked origin:', origin)
-      callback(new Error('Not allowed by CORS'))
-    }
-  },
+  origin: true, // Permite cualquier origen
   credentials: true
 }))
 
