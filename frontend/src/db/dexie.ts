@@ -62,6 +62,14 @@ export class InspeccionesDatabase extends Dexie {
   constructor() {
     super('inspeccionesDB')
     
+    // Versión 1 (inicial)
+    this.version(1).stores({
+      inspecciones: '++id,remoteId,posteId,tecnicoId,estado,syncStatus,lastModified',
+      colores: '++id,remoteId,name',
+      postes: '++id,remoteId,codigo,companyId'
+    })
+    
+    // Versión 2 (actual)
     this.version(2).stores({
       inspecciones: '++id,remoteId,posteId,tecnicoId,estado,syncStatus,lastModified',
       colores: '++id,remoteId,name',
@@ -72,9 +80,25 @@ export class InspeccionesDatabase extends Dexie {
 
 export const db = new InspeccionesDatabase()
 
+// Verificar que la base de datos esté lista
+db.on('ready', () => {
+  console.log('✅ IndexedDB (Dexie) inicializada correctamente')
+})
+
+db.on('blocked', () => {
+  console.error('⚠️ IndexedDB bloqueada - cierra otras pestañas')
+})
+
+db.on('versionchange', (event) => {
+  console.warn('⚠️ Cambio de versión de IndexedDB detectado:', event)
+  db.close()
+})
+
 // Helper para guardar inspecciones desde la API
 export async function saveInspeccionesToLocal(inspecciones: any[]) {
   try {
+    console.log('📋 Guardando inspecciones en IndexedDB:', inspecciones.length)
+    
     const localInspecciones: InspeccionLocal[] = inspecciones.map(insp => ({
       remoteId: insp.id,
       posteId: insp.posteId,
@@ -102,18 +126,24 @@ export async function saveInspeccionesToLocal(inspecciones: any[]) {
     // Limpiar inspecciones antiguas del mismo técnico
     const firstInsp = inspecciones[0]
     if (firstInsp) {
-      await db.inspecciones
+      const deleted = await db.inspecciones
         .where('tecnicoId')
         .equals(firstInsp.tecnicoId)
         .and(item => item.syncStatus === 'synced')
         .delete()
+      console.log(`🗑️ ${deleted} inspecciones antiguas eliminadas`)
     }
 
     // Insertar nuevas
     await db.inspecciones.bulkAdd(localInspecciones)
     console.log(`💾 ${localInspecciones.length} inspecciones guardadas en IndexedDB`)
+    
+    // Verificar
+    const count = await db.inspecciones.count()
+    console.log(`✅ Total de inspecciones en IndexedDB: ${count}`)
   } catch (error) {
-    console.error('Error guardando inspecciones locales:', error)
+    console.error('❌ Error guardando inspecciones locales:', error)
+    throw error
   }
 }
 
@@ -133,16 +163,31 @@ export async function getLocalInspecciones(tecnicoId: number): Promise<Inspeccio
 // Helper para guardar colores
 export async function saveColoresToLocal(colores: any[]) {
   try {
+    console.log('🎨 Guardando colores en IndexedDB:', colores)
+    
     const localColores: ColorLocal[] = colores.map(color => ({
       remoteId: color.id,
       name: color.name
     }))
 
+    console.log('🎨 Colores mapeados:', localColores)
+    
     await db.colores.clear()
+    console.log('🗑️ Tabla colores limpiada')
+    
     await db.colores.bulkAdd(localColores)
     console.log(`💾 ${localColores.length} colores guardados en IndexedDB`)
+    
+    // Verificar que se guardaron
+    const count = await db.colores.count()
+    console.log(`✅ Verificación: ${count} colores en IndexedDB`)
+    
+    if (count !== localColores.length) {
+      console.error('⚠️ Advertencia: No se guardaron todos los colores')
+    }
   } catch (error) {
-    console.error('Error guardando colores locales:', error)
+    console.error('❌ Error guardando colores locales:', error)
+    throw error
   }
 }
 
