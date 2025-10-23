@@ -143,7 +143,7 @@ export async function saveInspeccionesToLocal(inspecciones: any[]) {
     console.log(`✅ Total de inspecciones en IndexedDB: ${count}`)
   } catch (error) {
     console.error('❌ Error guardando inspecciones locales:', error)
-    throw error
+    // No lanzar el error para no interrumpir el flujo
   }
 }
 
@@ -187,7 +187,7 @@ export async function saveColoresToLocal(colores: any[]) {
     }
   } catch (error) {
     console.error('❌ Error guardando colores locales:', error)
-    throw error
+    // No lanzar el error para no interrumpir el flujo
   }
 }
 
@@ -223,7 +223,7 @@ export async function savePostesToLocal(postes: any[]) {
     }
   } catch (error) {
     console.error('❌ Error guardando postes locales:', error)
-    throw error
+    // No lanzar el error para no interrumpir el flujo
   }
 }
 
