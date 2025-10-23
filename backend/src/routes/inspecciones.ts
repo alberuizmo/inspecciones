@@ -47,6 +47,11 @@ router.post('/', async (req: Request, res: Response) => {
       fechaEjecucion
     } = req.body
 
+    // Validar campos requeridos
+    if (!posteId || !tecnicoId || !estado) {
+      return res.status(400).json({ error: 'posteId, tecnicoId y estado son requeridos' })
+    }
+
     const [result] = await pool.query(
       `INSERT INTO Inspeccion (
         posteId, tecnicoId, supervisorId, estado, altura, estadoPintura,
@@ -54,10 +59,22 @@ router.post('/', async (req: Request, res: Response) => {
         lngReal, firma, fechaEjecucion, syncStatus
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        posteId, tecnicoId, supervisorId, estado, altura, estadoPintura,
-        colorId, funcionando, estadoBase, observaciones, 
-        fotos, // Ya viene como string JSON o null
-        latReal, lngReal, firma, fechaEjecucion, 'synced'
+        posteId, 
+        tecnicoId, 
+        supervisorId || null, 
+        estado, 
+        altura || null, 
+        estadoPintura || null,
+        colorId || null, 
+        funcionando || null, 
+        estadoBase || null, 
+        observaciones || null, 
+        fotos || null, // Ya viene como string JSON o null
+        latReal || null, 
+        lngReal || null, 
+        firma || null, 
+        fechaEjecucion || null, 
+        'pending'
       ]
     )
 
@@ -65,9 +82,11 @@ router.post('/', async (req: Request, res: Response) => {
       success: true, 
       id: (result as any).insertId 
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creando inspección:', error)
-    res.status(500).json({ error: 'Error al crear inspección' })
+    console.error('Error code:', error.code)
+    console.error('Error message:', error.message)
+    res.status(500).json({ error: 'Error al crear inspección', details: error.message })
   }
 })
 
