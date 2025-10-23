@@ -163,8 +163,10 @@ const cargarTareas = async () => {
       const response = await api.get(`/inspecciones/tecnico/${tecnicoId}`)
       tareasFromAPI = response.data
       
-      // NO guardar en IndexedDB - las inspecciones completadas están en el servidor
-      // Solo IndexedDB guarda inspecciones pendientes de sincronización
+      // Guardar en IndexedDB para cache offline
+      if (tareasFromAPI.length > 0) {
+        await saveInspeccionesToLocal(tareasFromAPI)
+      }
       
       console.log(`✅ ${tareasFromAPI.length} tareas cargadas desde API`)
     } catch (apiError: any) {
