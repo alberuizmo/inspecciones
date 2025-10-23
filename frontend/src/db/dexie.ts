@@ -194,6 +194,8 @@ export async function saveColoresToLocal(colores: any[]) {
 // Helper para guardar postes
 export async function savePostesToLocal(postes: any[]) {
   try {
+    console.log('📍 Guardando postes en IndexedDB:', postes.length)
+    
     const localPostes: PosteLocal[] = postes.map(poste => ({
       remoteId: poste.id,
       codigo: poste.codigo,
@@ -204,11 +206,24 @@ export async function savePostesToLocal(postes: any[]) {
       companyId: poste.companyId
     }))
 
+    console.log('📍 Postes mapeados:', localPostes.length)
+    
     await db.postes.clear()
+    console.log('🗑️ Tabla postes limpiada')
+    
     await db.postes.bulkAdd(localPostes)
     console.log(`💾 ${localPostes.length} postes guardados en IndexedDB`)
+    
+    // Verificar que se guardaron
+    const count = await db.postes.count()
+    console.log(`✅ Verificación: ${count} postes en IndexedDB`)
+    
+    if (count !== localPostes.length) {
+      console.error('⚠️ Advertencia: No se guardaron todos los postes')
+    }
   } catch (error) {
-    console.error('Error guardando postes locales:', error)
+    console.error('❌ Error guardando postes locales:', error)
+    throw error
   }
 }
 
