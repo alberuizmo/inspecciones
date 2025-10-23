@@ -218,9 +218,13 @@ const cargarTareas = async () => {
       })
     }
     
-    // Agregar inspecciones locales pendientes de sincronización
+    // Agregar inspecciones locales
     inspeccionesLocales.forEach(local => {
-      if (local.syncStatus === 'pending') {
+      // Si estamos offline, mostrar TODAS las inspecciones locales
+      // Si estamos online, solo mostrar las pendientes de sincronización
+      const mostrarInspeccion = !apiDisponible || local.syncStatus === 'pending'
+      
+      if (mostrarInspeccion) {
         // Usar el remoteId como ID para mostrar en la lista
         const displayId = local.remoteId || local.id || -(Date.now())
         
@@ -234,7 +238,7 @@ const cargarTareas = async () => {
           fechaAsignacion: local.fechaAsignacion,
           fechaEjecucion: local.fechaEjecucion,
           estado: local.estado,
-          syncStatus: 'pending',
+          syncStatus: local.syncStatus,
           localId: local.id
         })
       }
