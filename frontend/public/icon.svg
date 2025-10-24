@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#FFD700"/>
+  <g transform="translate(256,256)">
+    <!-- Poste -->
+    <rect x="-20" y="-150" width="40" height="200" fill="#000000"/>
+    <!-- Base -->
+    <rect x="-40" y="50" width="80" height="60" fill="#333333"/>
+    <!-- Luz -->
+    <circle cx="0" cy="-170" r="35" fill="#FFFFFF"/>
+    <path d="M -25,-135 L 0,-170 L 25,-135 Z" fill="#FFF59D"/>
+  </g>
+  <!-- Texto -->
+  <text x="256" y="420" text-anchor="middle" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="#000000">Inspecciones</text>
+</svg>
