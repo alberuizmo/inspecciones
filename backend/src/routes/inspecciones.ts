@@ -4,6 +4,18 @@ import { RowDataPacket } from 'mysql2'
 
 const router = Router()
 
+// Función para convertir ISO date string a MySQL DATETIME
+function toMySQLDateTime(isoString: string | null): string | null {
+  if (!isoString) return null
+  try {
+    const date = new Date(isoString)
+    return date.toISOString().slice(0, 19).replace('T', ' ')
+  } catch (error) {
+    console.error('Error convirtiendo fecha:', error)
+    return null
+  }
+}
+
 interface InspeccionRow extends RowDataPacket {
   id: number
   posteId: number
@@ -73,7 +85,7 @@ router.post('/', async (req: Request, res: Response) => {
         latReal || null, 
         lngReal || null, 
         firma || null, 
-        fechaEjecucion || null, 
+        toMySQLDateTime(fechaEjecucion), 
         'pending'
       ]
     )
@@ -193,7 +205,7 @@ router.put('/:id', async (req: Request, res: Response) => {
       [
         estado, altura, estadoPintura, colorId, funcionando, estadoBase,
         observaciones, fotos, // Ya viene como string JSON desde el frontend
-        latReal, lngReal, firma, fechaEjecucion, id
+        latReal, lngReal, firma, toMySQLDateTime(fechaEjecucion), id
       ]
     )
 
@@ -228,7 +240,7 @@ router.post('/sync', async (req: Request, res: Response) => {
             insp.altura, insp.estadoPintura, insp.colorId, insp.funcionando,
             insp.estadoBase, insp.observaciones,
             insp.fotos, // Ya viene como string JSON
-            insp.latReal, insp.lngReal, insp.firma, insp.fechaEjecucion, 'synced'
+            insp.latReal, insp.lngReal, insp.firma, toMySQLDateTime(insp.fechaEjecucion), 'synced'
           ]
         )
 
