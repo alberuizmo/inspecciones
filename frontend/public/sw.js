@@ -176,7 +176,7 @@ async function syncInspecciones() {
 
 function openIndexedDB() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('InspeccionesDB', 1)
+    const request = indexedDB.open('inspeccionesDB', 2) // Nombre correcto y versión 2
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
   })

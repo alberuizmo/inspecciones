@@ -73,12 +73,26 @@ router.beforeEach((to: any, from: any, next: any) => {
   next()
 })
 
-// Register service worker
+// Register service worker (en desarrollo y producción)
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
-      .then(reg => console.log('SW registered:', reg))
-      .catch(err => console.log('SW registration failed:', err))
+      .then(reg => {
+        console.log('✅ Service Worker registered:', reg.scope)
+        
+        // Actualizar SW cuando haya una nueva versión
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing
+          console.log('🔄 Service Worker updating...')
+          
+          newWorker?.addEventListener('statechange', () => {
+            if (newWorker.state === 'activated') {
+              console.log('✅ Service Worker activated')
+            }
+          })
+        })
+      })
+      .catch(err => console.error('❌ SW registration failed:', err))
   })
 }
 
