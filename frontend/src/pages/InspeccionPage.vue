@@ -455,17 +455,38 @@ const guardarInspeccion = async () => {
 onMounted(async () => {
   // Cargar la inspección asignada para obtener el posteId
   try {
+    // Primero intentar desde la API
     const response = await api.get(`/inspecciones/${route.params.id}`)
     inspeccionId.value = response.data.id
     posteId.value = response.data.posteId
     posteCodigo.value = response.data.posteCodigo || `Poste #${response.data.posteId}`
     posteUbicacion.value = response.data.posteUbicacion || ''
-    console.log(`📋 Inspección cargada - ID: ${inspeccionId.value}, Poste: ${posteCodigo.value}`)
-  } catch (error) {
-    console.error('Error cargando inspección:', error)
-    alert('Error al cargar la inspección')
-    router.push('/inspecciones')
-    return
+    console.log(`📋 Inspección cargada desde API - ID: ${inspeccionId.value}, Poste: ${posteCodigo.value}`)
+  } catch (apiError) {
+    // Si falla, buscar en IndexedDB (offline)
+    console.warn('⚠️ API no disponible, cargando desde IndexedDB...')
+    try {
+      const remoteId = parseInt(route.params.id as string)
+      const inspeccionLocal = await db.inspecciones
+        .where('remoteId')
+        .equals(remoteId)
+        .first()
+      
+      if (inspeccionLocal) {
+        inspeccionId.value = inspeccionLocal.remoteId || inspeccionLocal.id || 0
+        posteId.value = inspeccionLocal.posteId
+        posteCodigo.value = inspeccionLocal.posteCodigo || `Poste #${inspeccionLocal.posteId}`
+        posteUbicacion.value = inspeccionLocal.posteUbicacion || ''
+        console.log(`💾 Inspección cargada desde IndexedDB - ID: ${inspeccionId.value}, Poste: ${posteCodigo.value}`)
+      } else {
+        throw new Error('Inspección no encontrada en IndexedDB')
+      }
+    } catch (dbError) {
+      console.error('❌ Error cargando inspección:', dbError)
+      alert('Error: No se pudo cargar la inspección. Asegúrate de tener conexión o de haber cargado los datos previamente.')
+      router.push('/inspecciones')
+      return
+    }
   }
 
   // Cargar colores desde API o IndexedDB
