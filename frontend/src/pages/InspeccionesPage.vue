@@ -145,6 +145,68 @@ const formatDate = (date: string) => {
   })
 }
 
+const cargarColores = async () => {
+  try {
+    const { db } = await import('../db/dexie')
+    
+    // Intentar cargar desde la API
+    const response = await api.get('/colores')
+    const colores = response.data
+    
+    // Guardar en IndexedDB
+    await db.colores.clear()
+    await db.colores.bulkAdd(colores)
+    
+    console.log(`🎨 ${colores.length} colores cargados y guardados en IndexedDB`)
+  } catch (error) {
+    console.warn('⚠️ Error cargando colores desde API:', error)
+    
+    // Verificar si hay colores en IndexedDB
+    const { db } = await import('../db/dexie')
+    const coloresLocales = await db.colores.toArray()
+    
+    if (coloresLocales.length > 0) {
+      console.log(`💾 Usando ${coloresLocales.length} colores desde IndexedDB`)
+    } else {
+      console.error('❌ No hay colores disponibles offline')
+    }
+  }
+}
+
+const cargarPostes = async () => {
+  try {
+    const companyId = authStore.user?.companyId
+    if (!companyId) {
+      console.warn('⚠️ No se encontró el companyId del usuario')
+      return
+    }
+
+    const { db } = await import('../db/dexie')
+    
+    // Intentar cargar desde la API con query parameter
+    const response = await api.get(`/postes?companyId=${companyId}`)
+    const postes = response.data
+    
+    // Guardar en IndexedDB
+    await db.postes.clear()
+    await db.postes.bulkAdd(postes)
+    
+    console.log(`📍 ${postes.length} postes cargados y guardados en IndexedDB`)
+  } catch (error) {
+    console.warn('⚠️ Error cargando postes desde API:', error)
+    
+    // Verificar si hay postes en IndexedDB
+    const { db } = await import('../db/dexie')
+    const postesLocales = await db.postes.toArray()
+    
+    if (postesLocales.length > 0) {
+      console.log(`💾 Usando ${postesLocales.length} postes desde IndexedDB`)
+    } else {
+      console.error('❌ No hay postes disponibles offline')
+    }
+  }
+}
+
 const cargarTareas = async () => {
   loading.value = true
   error.value = ''
@@ -169,6 +231,13 @@ const cargarTareas = async () => {
       }
       
       console.log(`✅ ${tareasFromAPI.length} tareas cargadas desde API`)
+
+      // Cargar y cachear colores
+      await cargarColores()
+      
+      // Cargar y cachear postes
+      await cargarPostes()
+      
     } catch (apiError: any) {
       console.warn('⚠️ API no disponible')
       apiDisponible = false
